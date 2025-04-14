@@ -1,52 +1,48 @@
 import os
 import requests
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 from dotenv import load_dotenv
+from telegram import Bot
+from telegram.ext import Updater, CommandHandler
+from apscheduler.schedulers.background import BackgroundScheduler
 
 load_dotenv()
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+bot = Bot(token=TOKEN)
+
+# Risikomanagement-Konstanten
+account_size = 2500  # z. B. 2.500 $
+risk_per_trade = account_size * 0.10  # 10 % pro Trade
+daily_drawdown_limit = 500  # Maximaler Verlust pro Tag
 
 def get_btc_price():
-    url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
-    r = requests.get(url)
-    return float(r.json()["price"])
+    response = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd")
+    data = response.json()
+    return data["bitcoin"]["usd"]
 
-def calculate_lot(btc_price, stop_loss, capital=10000, invest_pct=0.10, risk=250):
-    invest = capital * invest_pct
-    lot_by_risk = (risk / stop_loss) * btc_price / 100000
-    lot_by_capital = invest / btc_price
-    return round(min(lot_by_risk, lot_by_capital), 3)
-
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text("Hey! Schick mir einfach deinen Stop-Loss in Dollar (z. B. 250), und ich berechne deine Lotgröße für BTC/USD.")
-
-def handle_message(update: Update, context: CallbackContext):
-    try:
-        sl = float(update.message.text.strip())
-        btc_price = get_btc_price()
-        lot = calculate_lot(btc_price, sl)
-        msg = (
-            f"Aktueller BTC/USD-Preis: {btc_price:.2f} $
+def send_price(context=None):
+    btc_price = get_btc_price()
+    message = (
+        f"Aktueller BTC/USD-Preis: {btc_price:.2f} $
 "
-            f"Stop-Loss: {sl} $
+        f"Risiko pro Trade: {risk_per_trade:.2f} $
 "
-            f"Empfohlene Lotgröße: *{lot} Lots*
-"
-            f"(Risiko: max 250 $, Invest: 10 % von 10.000 $)"
-        )
-        update.message.reply_text(msg, parse_mode='Markdown')
-    except Exception as e:
-        update.message.reply_text("Bitte sende nur eine Zahl (z. B. 250).")
+        f"Maximaler Drawdown: {daily_drawdown_limit:.2f} $"
+    )
+    bot.send_message(chat_id=CHAT_ID, text=message)
 
-def main():
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
-    updater.start_polling()
-    updater.idle()
+def start(update, context):
+    update.message.reply_text("Steppers LotBot ist aktiv.")
 
 if __name__ == "__main__":
-    main()
+    updater = Updater(token=TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
+    dispatcher.add_handler(CommandHandler("start", start))
+
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(send_price, "interval", hours=1)
+    scheduler.start()
+
+    updater.start_polling()
+    updater.idle()
