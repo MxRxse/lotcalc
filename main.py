@@ -12,22 +12,21 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 bot = Bot(token=TOKEN)
 
 # Risikomanagement-Konstanten
-account_size = 2500  # z. B. 2.500 $
-risk_per_trade = account_size * 0.10  # 10 % pro Trade
+account_size = 10000  # z. B. 2.500 $
+risk_per_trade = account_size * 0.10  # 10 % pro Trade
 daily_drawdown_limit = 500  # Maximaler Verlust pro Tag
 
 def get_btc_price():
-    response = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd")
+    url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+    response = requests.get(url)
     data = response.json()
-    return data["bitcoin"]["usd"]
+    return float(data["price"])
 
 def send_price(context=None):
     btc_price = get_btc_price()
     message = (
-        f"Aktueller BTC/USD-Preis: {btc_price:.2f} $
-"
-        f"Risiko pro Trade: {risk_per_trade:.2f} $
-"
+        f"Aktueller BTC/USD-Preis: {btc_price:.2f} $\n"
+        f"Risiko pro Trade: {risk_per_trade:.2f} $\n"
         f"Maximaler Drawdown: {daily_drawdown_limit:.2f} $"
     )
     bot.send_message(chat_id=CHAT_ID, text=message)
