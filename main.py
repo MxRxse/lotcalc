@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from telegram import Bot
 from telegram.ext import Updater, CommandHandler
 from apscheduler.schedulers.background import BackgroundScheduler
+import pytz  # Importiert pytz für die Zeitzone
 
 load_dotenv()
 
@@ -12,7 +13,7 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 bot = Bot(token=TOKEN)
 
 # Risikomanagement-Konstanten
-account_size = 10000  # z. B. 2.500 $
+account_size = 2500  # z. B. 2.500 $
 risk_per_trade = account_size * 0.10  # 10 % pro Trade
 daily_drawdown_limit = 500  # Maximaler Verlust pro Tag
 
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
 
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(timezone=pytz.UTC)  # Setze explizit pytz.UTC als Zeitzone
     scheduler.add_job(send_price, "interval", hours=1)
     scheduler.start()
 
