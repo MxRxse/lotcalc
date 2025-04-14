@@ -1,13 +1,17 @@
 import os
 import requests
+import logging
+import threading
+import pytz
+
 from dotenv import load_dotenv
+from flask import Flask
 from telegram import Bot
 from telegram.ext import Updater, CommandHandler
 from apscheduler.schedulers.background import BackgroundScheduler
-import pytz
-import logging
 from telegram.error import TimedOut
 
+# Logging konfigurieren
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -20,9 +24,10 @@ TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 bot = Bot(token=TOKEN)
 
-account_size = 2500  # z. B. 2.500 $
+# Risikomanagement-Konstanten
+account_size = 2500          # Beispiel: 2.500 $
 risk_per_trade = account_size * 0.10  # 10 % pro Trade
-daily_drawdown_limit = 500  # Maximaler Verlust pro Tag
+daily_drawdown_limit = 500   # Maximaler Verlust pro Tag
 
 def get_btc_price():
     try:
@@ -55,7 +60,7 @@ def send_price(context=None):
 def start(update, context):
     update.message.reply_text("Steppers LotBot ist aktiv.")
 
-if __name__ == "__main__":
+def run_bot():
     updater = Updater(token=TOKEN, use_context=True)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
@@ -66,3 +71,18 @@ if __name__ == "__main__":
 
     updater.start_polling()
     updater.idle()
+
+# Minimaler Flask-Webserver für Portbindung (wichtig für Render)
+app = Flask(__name__)
+
+@app.route("/")
+def index():
+    return "OK"
+
+if __name__ == "__main__":
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.start()
+    
+    # PORT von Render verwenden (Default 5000, falls nicht gesetzt)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
